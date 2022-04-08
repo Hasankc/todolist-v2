@@ -29,6 +29,13 @@ const item3 = new Item({
 
 const defaultItems = [item1, item2, item3];
 
+const listSchema = {
+  name: String,
+  items: [itemsSchema]
+}
+
+const List = mongoose.model("List", listSchema)
+
 app.get("/", function (req, res) {
   Item.find({}, function (err, foundUtems) {
     if (foundUtems.length === 0) {
@@ -48,19 +55,65 @@ app.get("/", function (req, res) {
 });
 
 app.post("/", function (req, res) {
-  const item = req.body.newItem;
+  const itemName = req.body.newItem;
+  const listName = req.body.list
 
-  if (req.body.list === "Work") {
-    workItems.push(item);
-    res.redirect("/work");
+  const item = new Item({
+    name: itemName
+  })
+  
+  if(listName === "Today"){
+    item.save()
+    res.redirect("/")
   } else {
-    items.push(item);
-    res.redirect("/");
+    List.findOne({name: listName}, function(err, foundList){
+      foundList.items.push(item)
+      foundList.save()
+      res.redirect('/' + listName)
+    })
+
   }
+
+  
 });
 
-app.get("/work", function (req, res) {
-  res.render("list", { listTitle: "Work List", newListItems: workItems });
+app.post("/delete", function(req, res){
+ 
+  const itemToDelete = req.body.checkbox;
+ 
+  Item.findByIdAndRemove(itemToDelete, function(err) {
+    if(err){
+      console.log(err);
+    }  else {
+      console.log("Item Deleted")
+      res.redirect("/");
+    }
+  })
+});
+
+
+app.get("/:customListName", function (req, res) {
+  const coustomListName = req.params.customListName
+
+  List.findOne({name: coustomListName}, function(err, foundList){
+    if(!err){
+      if (!foundList){
+        const list = new List({
+          name: coustomListName,
+          items: defaultItems
+        })
+        list.save()
+        res.redirect("/" + coustomListName)
+      } else{
+        res.render("list", { listTitle: foundList.name, newListItems: foundList.items })
+      }
+    }
+  })
+  const list = new List({
+    name: coustomListName,
+    items: defaultItems
+  })
+  list.save()
 });
 
 app.get("/about", function (req, res) {
