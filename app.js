@@ -3,7 +3,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-
+const _ = require("lodash")
 const app = express();
 
 app.set("view engine", "ejs");
@@ -37,8 +37,8 @@ const listSchema = {
 const List = mongoose.model("List", listSchema)
 
 app.get("/", function (req, res) {
-  Item.find({}, function (err, foundUtems) {
-    if (foundUtems.length === 0) {
+  Item.find({}, function (err, foundItems) {
+    if (foundItems.length === 0) {
       Item.insertMany(defaultItems, function (err) {
         if (err) {
           console.log(err);
@@ -48,10 +48,35 @@ app.get("/", function (req, res) {
       });
       res.redirect('/')
     } else {
-      res.render("list", { listTitle: "Today", newListItems: foundUtems });
+     
+      res.render("list", { listTitle: "Today", newListItems: foundItems });
     }
     
   });
+});
+
+app.get("/:customListName", function (req, res) {
+  const coustomListName = _.capitalize(req.params.customListName) 
+
+  List.findOne({name: coustomListName}, function(err, foundList){
+    if(!err){
+      if (!foundList){
+        const list = new List({
+          name: coustomListName,
+          items: defaultItems
+        })
+        list.save()
+        res.redirect("/" + coustomListName)
+      } else{
+        res.render("list", { listTitle: foundList.name, newListItems: foundList.items })
+      }
+    }
+  })
+  const list = new List({
+    name: coustomListName,
+    items: defaultItems
+  })
+  list.save()
 });
 
 app.post("/", function (req, res) {
@@ -80,41 +105,30 @@ app.post("/", function (req, res) {
 app.post("/delete", function(req, res){
  
   const itemToDelete = req.body.checkbox;
- 
-  Item.findByIdAndRemove(itemToDelete, function(err) {
-    if(err){
-      console.log(err);
-    }  else {
-      console.log("Item Deleted")
-      res.redirect("/");
-    }
-  })
-});
-
-
-app.get("/:customListName", function (req, res) {
-  const coustomListName = req.params.customListName
-
-  List.findOne({name: coustomListName}, function(err, foundList){
-    if(!err){
-      if (!foundList){
-        const list = new List({
-          name: coustomListName,
-          items: defaultItems
-        })
-        list.save()
-        res.redirect("/" + coustomListName)
-      } else{
-        res.render("list", { listTitle: foundList.name, newListItems: foundList.items })
+  const listName = req.body.listName
+  
+  if (listName === "today") {
+    Item.findByIdAndRemove(itemToDelete, function(err) {
+      if(err){
+        console.log(err);
+      }  else {
+        console.log("Item Deleted")
+        res.redirect("/");
       }
-    }
-  })
-  const list = new List({
-    name: coustomListName,
-    items: defaultItems
-  })
-  list.save()
+    })
+  } else {
+    List.findOneAndUpdate({name: listName}, {$pull: {items: {_id: itemToDelete}}}, function(err, foundList){
+      if (!err) {
+        res.redirect("/" + listName)
+      }
+    })
+  }
+
+  
 });
+
+
+
 
 app.get("/about", function (req, res) {
   res.render("about");
